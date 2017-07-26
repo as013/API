@@ -7,7 +7,7 @@ require_once APPPATH . '/libraries/JWT.php';
 
 use \Firebase\JWT\JWT;
 
-class Users extends REST_Controller
+class Layanan extends REST_Controller
 {
 
     public function __construct() {
