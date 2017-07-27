@@ -18,7 +18,10 @@ class Layanan extends REST_Controller
 
     public function layanan_create_post(){
         $headers = $this->input->request_headers();
-        $auth_token = $headers['X-Auth-Token'];
+        $auth_token = null;
+        if (isset($headers['X-Auth-Token'])){
+            $auth_token = $headers['X-Auth-Token'];
+        }
 
         $invalid_token = ['invalid' => 'Token is invalid'];
         if(!$auth_token){
@@ -32,8 +35,8 @@ class Layanan extends REST_Controller
             return;
         }
 
-        $layanan = $this->post('username');
-        $deskripsi = $this->post('password');
+        $layanan = $this->post('layanan');
+        $deskripsi = $this->post('deskripsi');
 
         $invalid_parameter = [
             'success' => FALSE,
@@ -66,7 +69,10 @@ class Layanan extends REST_Controller
 
     public function layanan_all_get(){
         $headers = $this->input->request_headers();
-        $auth_token = $headers['X-Auth-Token'];
+        $auth_token = null;
+        if (isset($headers['X-Auth-Token'])){
+            $auth_token = $headers['X-Auth-Token'];
+        }
 
         $invalid_token = ['invalid' => 'Token is invalid'];
         if(!$auth_token){
@@ -82,18 +88,22 @@ class Layanan extends REST_Controller
 
         $allLayanan = $this->M_Layanan->getAllLayanan();
         $output = [
-            'id'  => $allLayanan->id,
-            'layanan'     => $allLayanan->layanan,
-            'deskripsi'     => $allLayanan->deskripsi,
+            'id'  => $allLayanan[0]->id,
+            'layanan'     => $allLayanan[0]->layanan,
+            'deskripsi'     => $allLayanan[0]->deskripsi,
         ];
-        $this->set_response($output, REST_Controller::HTTP_OK);
+        $this->set_response($allLayanan, REST_Controller::HTTP_OK);
     }
 
     public function layanan_info_get(){
         $headers = $this->input->request_headers();
-        $auth_token = $headers['X-Auth-Token'];
+        $auth_token = null;
+        if (isset($headers['X-Auth-Token'])){
+            $auth_token = $headers['X-Auth-Token'];
+        }
 
-        $idLayanan = $this->post('idLayanan');
+
+        $idLayanan = $this->get('idLayanan');
 
         $invalid_token = ['invalid' => 'Token is invalid'];
         if(!$auth_token){

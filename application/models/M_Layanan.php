@@ -15,7 +15,6 @@ class M_Layanan extends CI_Model
 
         return $query->result();
 
-        return false;
     }
 
     public function getLayananByID($id){

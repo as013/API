@@ -11,26 +11,44 @@ require_once APPPATH . '/libraries/JWT.php';
  */
 use \Firebase\JWT\JWT;
 
-class Users extends REST_Controller
+class Talent extends REST_Controller
 {
 
     public function __construct() {
         parent::__construct();
         $this->load->model('M_Users');
         $this->load->model('M_Auth_Token');
+        $this->load->model('M_Talent');
     }
 
     public function sign_up_post(){
         $username = $this->post('username');
         $password = $this->post('password');
         $email = $this->post('email');
+        $talent = $this->post('talent');
+        $lat = $this->post('lat');
+        $lang = $this->post('lng');
+        $alamat = $this->post('alamat') ;
+        $no_hp = $this->post('no_hp');
+        $no_telp = $this->post('no_telp') ;
+        $keterangan = $this->post('keterangan');
+
 
         $invalid_parameter = [
             'success' => FALSE,
             'message' => 'Invalid parameter'
         ];
 
-        if(!$username && !$password && !$email){
+        if(!$username
+            && !$password
+            && !$email
+            && !$talent
+            && !$lat
+            && !$lang
+            && !$alamat
+            && !$no_hp
+            && !$no_telp
+            && !$keterangan) {
             $this->response($invalid_parameter, REST_Controller::HTTP_NOT_FOUND);
             return;
         }
@@ -53,7 +71,20 @@ class Users extends REST_Controller
             'email'     => $email
         ];
 
+        $dataTalent = [
+            'talent'  => $talent,
+            'alamat'  => $alamat,
+            'no_hp'     => $no_hp,
+            'no_telp'  => $no_telp,
+            'lat'  => $lat,
+            'lang'     => $lang,
+            'email'  => $email,
+            'keterangan'  => $keterangan
+        ];
+
         $this->M_Users->createUser($data);
+        $this->M_Talent->createTalent($dataTalent);
+
         $output = [
             'success' => TRUE
         ];
@@ -106,12 +137,10 @@ class Users extends REST_Controller
         }
     }
 
-    public function user_info_get(){
+    public function talent_info_get(){
         $headers = $this->input->request_headers();
-        $auth_token = null;
-        if (isset($headers['X-Auth-Token'])){
-            $auth_token = $headers['X-Auth-Token'];
-        }
+        $auth_token = $headers['X-Auth-Token'];
+        $idTalent = $this->get('id');
 
         $invalid_token = ['invalid' => 'Token is invalid'];
         if(!$auth_token){
@@ -125,20 +154,24 @@ class Users extends REST_Controller
             return;
         }
 
-        $user = $this->M_Users->getUserByID($userToken->user_id);
+
+        $talent = $this->M_Talent->getTalentByID($idTalent);
         $output = [
-            'username'  => $user->username,
-            'email'     => $user->email
+            'talent'  => $talent->talent,
+            'email'     => $talent->email,
+            'alamat'  => $talent->alamat,
+            'no_hp'     => $talent->no_hp,
+            'no_telp'  => $talent->no_telp,
+            'lat'  => $talent->lat,
+            'lang'     => $talent->lang,
+            'keterangan'  => $talent->keterangan
         ];
         $this->set_response($output, REST_Controller::HTTP_OK);
     }
 
     public function logout_get(){
         $headers = $this->input->request_headers();
-        $auth_token = null;
-        if (isset($headers['X-Auth-Token'])){
-            $auth_token = $headers['X-Auth-Token'];
-        }
+        $auth_token = $headers['X-Auth-Token'];
 
         $invalid_token = ['invalid' => 'Token is invalid'];
         if(!$auth_token){
