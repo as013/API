@@ -18,54 +18,94 @@ class Users extends REST_Controller
         parent::__construct();
         $this->load->model('M_Users');
         $this->load->model('M_Auth_Token');
+        $this->load->model('M_Roles');
     }
 
     public function sign_up_post(){
+        $headers = $this->input->request_headers();
+
+        $api_key = null;
+        if (isset($headers['X-API-KEY'])){
+            $api_key = $headers['X-API-KEY'];
+        }
+
+        if($api_key != $this->config->item('API_KEY')){
+            $status = false;
+            $msg = "Invalid API KEY.";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
+        }
+
         $username = $this->post('username');
         $password = $this->post('password');
         $email = $this->post('email');
+        $no_tlp = $this->post('no_telp');
 
-        $invalid_parameter = [
-            'success' => FALSE,
-            'message' => 'Invalid parameter'
-        ];
-
-        if(!$username && !$password && !$email){
-            $this->response($invalid_parameter, REST_Controller::HTTP_NOT_FOUND);
-            return;
+        if(!$username && !$password && !$email && !$no_tlp){
+            $status = false;
+            $msg = "Missing parameter.";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
         }
 
         if($this->M_Users->getUserByUsername($username)){
-            $invalid_parameter['message'] = "Username already exist.";
-            $this->response($invalid_parameter, REST_Controller::HTTP_NOT_FOUND);
-            return;
+            $status = false;
+            $msg = "Username already exist.";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
         }
 
         if(!filter_var($email, FILTER_VALIDATE_EMAIL)){
-            $invalid_parameter['message'] = "Invalid email address";
-            $this->response($invalid_parameter, REST_Controller::HTTP_NOT_FOUND);
-            return;
+            $status = false;
+            $msg = "Invalid email address";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
         }
 
-        $data = [
+        if($this->M_Users->getUserByEmail($email)){
+            $status = false;
+            $msg = "Email already exist.";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
+        }
+
+        $roles = $this->M_Roles->getRolesByRole('ROLE_USER');
+
+        $verfied_code = $this->encrypt->encode($username."_".$email, $this->config->item('SECRET_KEY'));
+
+        $data = array(
             'username'  => $username,
             'password'  => md5(md5($password)),
-            'email'     => $email
-        ];
+            'email'     => $email,
+            'no_telp'   => $no_tlp,
+            'is_verified'   => 0,
+            'verified_code' => $verfied_code,
+            'role'      => $roles->id
+        );
 
-        $this->M_Users->createUser($data);
-        $output = [
-            'success' => TRUE
-        ];
-        $this->set_response($output, REST_Controller::HTTP_OK);
+        $res = $this->M_Users->createUser($data);
+        $status = true;
+        $message = "User created succesfully.";
+        $this->set_response(restData($status, $message, ''), REST_Controller::HTTP_OK);
     }
 
     public function login_post() {
+        $headers = $this->input->request_headers();
+
+        $api_key = null;
+        if (isset($headers['X-API-KEY'])){
+            $api_key = $headers['X-API-KEY'];
+        }
+
+        if($api_key != $this->config->item('API_KEY')){
+            $status = false;
+            $msg = "Invalid API KEY.";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
+        }
+
         $username = $this->post('username');
         $password = $this->post('password');
 
-        $invalidLogin = ['invalid' => $username];
-        if(!$username || !$password) $this->response($invalidLogin, REST_Controller::HTTP_NOT_FOUND);
+        if(!$username || !$password){
+            $status = false;
+            $msg = "Invalid parameter.";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
+        }
 
         $user = $this->M_Users->login($username,$password);
 
@@ -83,7 +123,7 @@ class Users extends REST_Controller
                     'exp'       => $date->getTimestamp() + 60*60*5
                 ];
 
-                $access_token = JWT::encode($token, "Ca11m3S3kr3tK3y");
+                $access_token = JWT::encode($token, $this->config->item('SECRET_KEY'));
 
                 $data = [
                     'user_id'       => $user->id,
@@ -93,16 +133,18 @@ class Users extends REST_Controller
                 $this->M_Auth_Token->create_token($data);
             }
 
-            $output = [
+            $status = true;
+            $data = [
                 'username'      => $user->username,
                 'email'         => $user->email,
                 'access_token'  => $access_token
             ];
 
-
-            $this->set_response($output, REST_Controller::HTTP_OK);
+            $this->set_response(restData($status, '', $data), REST_Controller::HTTP_OK);
         }else{
-            $this->set_response($invalidLogin, REST_Controller::HTTP_NOT_FOUND);
+            $status = false;
+            $msg = "Invalid parameter.";
+            $this->set_response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
         }
     }
 
@@ -113,24 +155,28 @@ class Users extends REST_Controller
             $auth_token = $headers['X-Auth-Token'];
         }
 
-        $invalid_token = ['invalid' => 'Token is invalid'];
         if(!$auth_token){
-            $this->set_response($invalid_token, REST_Controller::HTTP_BAD_REQUEST);
-            return;
+            $status = false;
+            $msg = "Token is invalid";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
         }
 
         $userToken = $this->M_Auth_Token->check_auth_token($auth_token);
         if(!$userToken){
-            $this->set_response($invalid_token, REST_Controller::HTTP_UNAUTHORIZED);
-            return;
+            $status = false;
+            $msg = "Token is invalid";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
         }
 
         $user = $this->M_Users->getUserByID($userToken->user_id);
-        $output = [
+        $status = true;
+        $data = [
             'username'  => $user->username,
-            'email'     => $user->email
+            'email'     => $user->email,
+            'no_telp'   => $user->no_telp
         ];
-        $this->set_response($output, REST_Controller::HTTP_OK);
+
+        $this->set_response(restData($status, '', $data), REST_Controller::HTTP_OK);
     }
 
     public function logout_get(){
@@ -140,23 +186,23 @@ class Users extends REST_Controller
             $auth_token = $headers['X-Auth-Token'];
         }
 
-        $invalid_token = ['invalid' => 'Token is invalid'];
         if(!$auth_token){
-            $this->set_response($invalid_token, REST_Controller::HTTP_BAD_REQUEST);
-            return;
+            $status = false;
+            $msg = "Token is invalid";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
         }
 
         $userToken = $this->M_Auth_Token->check_auth_token($auth_token);
         if(!$userToken){
-            $this->set_response($invalid_token, REST_Controller::HTTP_UNAUTHORIZED);
-            return;
+            $status = false;
+            $msg = "Token is invalid";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
         }
 
         $this->M_Auth_Token->delete_token($userToken->id);
-        $output = [
-            'success' => TRUE
-        ];
+        $status = true;
+        $msg = "Logout successfully.";
 
-        $this->set_response($output, REST_Controller::HTTP_OK);
+        $this->set_response(restData($status, $msg, ''), REST_Controller::HTTP_OK);
     }
 }

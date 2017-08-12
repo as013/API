@@ -14,85 +14,98 @@ class Layanan extends REST_Controller
         parent::__construct();
         $this->load->model('M_Layanan');
         $this->load->model('M_Auth_Token');
+        $this->load->model('M_Users');
+        $this->load->model('M_Users_ROles');
     }
 
-    public function layanan_create_post(){
+    public function create_post(){
         $headers = $this->input->request_headers();
         $auth_token = null;
         if (isset($headers['X-Auth-Token'])){
             $auth_token = $headers['X-Auth-Token'];
         }
 
-        $invalid_token = ['invalid' => 'Token is invalid'];
         if(!$auth_token){
-            $this->set_response($invalid_token, REST_Controller::HTTP_BAD_REQUEST);
-            return;
+            $status = false;
+            $msg = "Token is invalid";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
         }
 
         $userToken = $this->M_Auth_Token->check_auth_token($auth_token);
         if(!$userToken){
-            $this->set_response($invalid_token, REST_Controller::HTTP_UNAUTHORIZED);
-            return;
+            $status = false;
+            $msg = "Token is invalid";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
+        }
+
+        $checkUserRole = $this->M_Users_ROles->getUserRoleByUser($userToken->user_id);
+        if($checkUserRole->role != $this->config->item('ROLE_ADMIN')){
+            $status = false;
+            $msg = "Unauthorized.";
+            $this->response(restData($status, $msg, $checkUserRole), REST_Controller::HTTP_UNAUTHORIZED);
         }
 
         $layanan = $this->post('layanan');
         $deskripsi = $this->post('deskripsi');
 
-        $invalid_parameter = [
-            'success' => FALSE,
-            'message' => 'Invalid parameter'
-        ];
-
-        if(!$layanan && !$deskripsi){
-            $this->response($invalid_parameter, REST_Controller::HTTP_NOT_FOUND);
-            return;
+        if(!$layanan){
+            $status = false;
+            $msg = "Missing parameter." . $layanan;
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
         }
-
-        // Harus ada juga ini ?
-        //if($this->M_Layanan->getLayananByUsername($username)){
-        //    $invalid_parameter['message'] = "Username already exist.";
-        //    $this->response($invalid_parameter, REST_Controller::HTTP_NOT_FOUND);
-        //    return;
-        //}
 
         $data = [
             'layanan'  => $layanan,
             'deskripsi'  => $deskripsi
         ];
 
-        $this->M_Layanan->createLayanan($data);
-        $output = [
-            'success' => TRUE
-        ];
-        $this->set_response($output, REST_Controller::HTTP_OK);
+        $create = $this->M_Layanan->createLayanan($data);
+        if($create > 0){
+            $status = true;
+            $msg = "Successfully saved.";
+
+            $this->set_response(restData($status, $msg, ''), REST_Controller::HTTP_OK);
+        }else{
+            $status = false;
+            $msg = "Error saving.";
+
+            $this->set_response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
+        }
+
     }
 
-    public function layanan_all_get(){
+    public function getAll_get(){
         $headers = $this->input->request_headers();
         $auth_token = null;
         if (isset($headers['X-Auth-Token'])){
             $auth_token = $headers['X-Auth-Token'];
         }
 
-        $invalid_token = ['invalid' => 'Token is invalid'];
         if(!$auth_token){
-            $this->set_response($invalid_token, REST_Controller::HTTP_BAD_REQUEST);
-            return;
+            $status = false;
+            $msg = "Token is invalid";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
         }
 
         $userToken = $this->M_Auth_Token->check_auth_token($auth_token);
         if(!$userToken){
-            $this->set_response($invalid_token, REST_Controller::HTTP_UNAUTHORIZED);
-            return;
+            $status = false;
+            $msg = "Token is invalid";
+            $this->response(restData($status, $msg, ''), REST_Controller::HTTP_NOT_FOUND);
         }
 
         $allLayanan = $this->M_Layanan->getAllLayanan();
-        $output = [
-            'id'  => $allLayanan[0]->id,
-            'layanan'     => $allLayanan[0]->layanan,
-            'deskripsi'     => $allLayanan[0]->deskripsi,
-        ];
-        $this->set_response($allLayanan, REST_Controller::HTTP_OK);
+        if($allLayanan){
+            $status = true;
+            $msg = "";
+
+            $this->set_response(restData($status, $msg, $allLayanan), REST_Controller::HTTP_OK);
+        }else{
+            $status = true;
+            $msg = "No data.";
+
+            $this->set_response(restData($status, $msg, ''), REST_Controller::HTTP_OK);
+        }
     }
 
     public function layanan_info_get(){

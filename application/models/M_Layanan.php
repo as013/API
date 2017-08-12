@@ -6,6 +6,7 @@ class M_Layanan extends CI_Model
 
     public function createLayanan($data){
         $this->db->insert('layanan', $data);
+        return $this->db->affected_rows();
     }
 
     public function getAllLayanan(){
